@@ -1,6 +1,7 @@
 import telebot
 from telebot import types
 import json
+import os
 
 # from main import user_data
 
@@ -12,7 +13,7 @@ def get_week_type():
 
 
 
-bot = telebot.TeleBot('bot_token')
+bot = telebot.TeleBot(os.environ.get("BOT_TOKEN"))
 
 ADMINS = [1917691975]
 
@@ -238,4 +239,5 @@ def save_homework(message):
 
 
 bot.infinity_polling()
+
 
