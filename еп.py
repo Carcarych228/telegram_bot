@@ -2,7 +2,6 @@ import telebot
 from telebot import types
 import json
 import os
-
 # from main import user_data
 
 from datetime import datetime
@@ -13,9 +12,9 @@ def get_week_type():
 
 
 
-bot = telebot.TeleBot(os.environ.get("BOT_TOKEN"))
+bot = telebot.TeleBot(os.environ.get"BOT_TOKEN")
 
-ADMINS = [1917691975]
+ADMINS = [1917691975, 1385003597]
 
 with open("shedule.json", "r", encoding="utf-8") as f:
     data = json.load(f)
@@ -124,30 +123,54 @@ def choose_day(message):
 @bot.callback_query_handler(func=lambda call: call.data == "homework")
 def choose_homework(call):
     user_id = call.from_user.id
-    lessons = data[user_state[user_id]["group"]][user_state[user_id]["subgroup"]][user_state[user_id]["week_type"]][user_state[user_id]["day"]]
+
+    if user_id not in ADMINS:
+        bot.answer_callback_query(call.id, "У вас нет прав")
+        return
+
+    keyboard = types.InlineKeyboardMarkup()
+    keyboard.add(types.InlineKeyboardButton("1", callback_data="hw_sb_1"), types.InlineKeyboardButton("2", callback_data="hw_sb_2"))
+    bot.answer_callback_query(call.id)
+    bot.send_message(call.message.chat.id, "Выберите подгруппу", reply_markup=keyboard)
+
+    # lessons = data[user_state[user_id]["group"]][user_state[user_id]["subgroup"]][user_state[user_id]["week_type"]][user_state[user_id]["day"]]
+    # keyboard = types.InlineKeyboardMarkup()
+    # for i, lesson in enumerate(lessons):
+    #     subject = lesson["предмет"]
+    #     keyboard.add(types.InlineKeyboardButton(text = subject, callback_data=f"lesson_{i}"))
+    # bot.answer_callback_query(call.id)
+    # bot.send_message(call.message.chat.id, "Выбери предмет: ", reply_markup=keyboard)
+@bot.callback_query_handler(func=lambda call: call.data.startswith("hw_sb_"))
+def choose_lesson_after_subgroup(call):
+    user_id = call.from_user.id
+    subgroup = call.data.split("_")[2]  # 1 или 2
+
+    # сохраняем выбранную подгруппу для ДЗ
+    user_state[user_id]["hw_subgroup"] = subgroup
+
+    lessons = data[user_state[user_id]["group"]][subgroup][user_state[user_id]["week_type"]][user_state[user_id]["day"]]
+
     keyboard = types.InlineKeyboardMarkup()
     for i, lesson in enumerate(lessons):
         subject = lesson["предмет"]
-        keyboard.add(types.InlineKeyboardButton(text = subject, callback_data=f"lesson_{i}"))
-    bot.answer_callback_query(call.id)
-    bot.send_message(call.message.chat.id, "Выбери предмет: ", reply_markup=keyboard)
+        keyboard.add(types.InlineKeyboardButton(text=subject, callback_data=f"lesson_{i}"))
 
+    bot.answer_callback_query(call.id)
+    bot.send_message(call.message.chat.id, "Выбери предмет:", reply_markup=keyboard)
 @bot.callback_query_handler(func=lambda call: call.data.startswith("lesson_"))
 def enter_homework(call):
     user_id = call.from_user.id
     lesson_index = int(call.data.split("_")[1])
 
     # сохраняем выбранный урок
-    lessons = data[user_state[user_id]["group"]][user_state[user_id]["subgroup"]][user_state[user_id]["week_type"]][user_state[user_id]["day"]]
+    lessons = data[user_state[user_id]["group"]][user_state[user_id]["hw_subgroup"]][user_state[user_id]["week_type"]][user_state[user_id]["day"]]
 
     selected_lesson = lessons[lesson_index]['предмет']
     user_state[user_id]["selected_lesson"] = selected_lesson
+    user_state[user_id]["selected_subgroup_for_hw"] = user_state[user_id]["hw_subgroup"]
 
     bot.answer_callback_query(call.id)
-    bot.send_message(
-        call.message.chat.id,
-        f"Введите ДЗ по предмету: {selected_lesson}"
-    )
+    bot.send_message(call.message.chat.id,f"Введите ДЗ по предмету: {selected_lesson}")
 
 
 @bot.message_handler(commands=["hw"])
@@ -199,6 +222,9 @@ def show_homework_for_day(call):
 @bot.message_handler(func=lambda message: True)
 def save_homework(message):
     user_id = message.from_user.id
+    if "selected_subgroup_for_hw" not in user_state[user_id]:
+        bot.send_message(message.chat.id, "⚠ Сначала выберите подгруппу для ДЗ")
+        return
 
     if user_id not in ADMINS:
         return
@@ -210,14 +236,16 @@ def save_homework(message):
     text = message.text
 
     group = user_state[user_id]["group"]
-    subgroup = user_state[user_id]["subgroup"]
+    subgroup = user_state[user_id]["selected_subgroup_for_hw"]
     week_type = user_state[user_id]["week_type"]
     day = user_state[user_id]["day"]
 
     homework.setdefault(group, {})
     homework[group].setdefault(subgroup, {})
     homework[group][subgroup].setdefault(week_type, {})
-    homework[group][subgroup].setdefault(day, {})
+    homework[group][subgroup][week_type].setdefault(day, {})  # ← ВАЖНО
+
+    existed = lesson in homework[group][subgroup][week_type][day]
 
     # ✅ Проверяем: было ли уже ДЗ по этому предмету
     existed = lesson in homework[group][subgroup][week_type][day]
@@ -235,11 +263,8 @@ def save_homework(message):
         bot.send_message(message.chat.id, f"✅ ДЗ по {lesson} сохранено!")
 
     del user_state[user_id]["selected_lesson"]
-
+    del user_state[user_id]["hw_subgroup"]
+    del user_state[user_id]["selected_subgroup_for_hw"]
 
 
 bot.infinity_polling()
-
-
-
-
