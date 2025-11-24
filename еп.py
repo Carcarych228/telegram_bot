@@ -9,7 +9,7 @@ from datetime import datetime
 
 def get_week_type():
     week_number = datetime.now().isocalendar().week
-    return "четная" if week_number % 2 == 0 else "нечетная"
+    return "четная" if week_number % 2 != 0 else "нечетная"
 
 
 
@@ -239,6 +239,7 @@ def save_homework(message):
 
 
 bot.infinity_polling()
+
 
 
 
