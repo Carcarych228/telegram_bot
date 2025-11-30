@@ -11,7 +11,7 @@ def get_week_type():
 
 
 
-bot = telebot.TeleBot('BOT_TOKEN')
+bot = telebot.TeleBot(os.enviren.get'BOT_TOKEN')
 
 ADMINS = [1917691975, 13850035]
 
@@ -271,3 +271,4 @@ def save_homework(message):
 
 
 bot.infinity_polling()
+
